@@ -1,0 +1,102 @@
+resource "aws_lb" "campusease_ingress_alb" {
+  name               = "${var.campusease_name}-${var.env}-ingress-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [data.aws_ssm_parameter.campusease_ingress_sg_id.value]
+  subnets            = split(",", data.aws_ssm_parameter.campusease_public_subnet_ids.value)
+
+  enable_deletion_protection = false
+
+  tags = merge(
+    var.campus_tags,
+    {
+      Name = "${var.campusease_name}-${var.env}-ingress-alb"
+    }
+  )
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.campusease_ingress_alb.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "text/html"
+      message_body = "<h1>This is fixed response from Web ALB</h1>"
+      status_code  = "200"
+    }
+  }
+}
+
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.campusease_ingress_alb.arn
+  port              = "443"
+  protocol          = "HTTPS"
+  certificate_arn   = data.aws_ssm_parameter.campusease_acm_certificate_arn.value
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+
+  default_action {
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "text/html"
+      message_body = "<h1>This is fixed response from Web ALB HTTPS</h1>"
+      status_code  = "200"
+    }
+  }
+}
+
+resource "aws_lb_target_group" "frontend" {
+  name        = "${var.campusease_name}-${var.env}-frontend"
+  port        = 8080
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = data.aws_ssm_parameter.campusease_vpc_id.value
+
+  health_check {
+    path                = "/"
+    port                = 8080
+    protocol            = "HTTP"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    matcher             = "200"
+  }
+}
+
+resource "aws_lb_listener_rule" "frontend" {
+  listener_arn = aws_lb_listener.https.arn
+  priority     = 100
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.frontend.arn
+  }
+
+  condition {
+    host_header {
+      values = ["${var.campusease_name}-${var.env}.${var.zone_name}"]
+    }
+  }
+}
+
+module "records" {
+  source  = "terraform-aws-modules/route53/aws//modules/records"
+  version = "~> 2.0"
+
+  zone_name = var.zone_name
+
+  records = [
+    {
+      name            = "${var.campusease_name}-${var.env}"
+      type            = "A"
+      allow_overwrite  = true
+      alias = {
+        name    = aws_lb.campusease_ingress_alb.dns_name
+        zone_id = aws_lb.campusease_ingress_alb.zone_id
+      }
+    }
+  ]
+}

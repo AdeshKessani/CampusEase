@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seatfinder-deploy
+  labels:
+    app: seatfinder
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: seatfinder
+  template:
+    metadata:
+      labels:
+        app: seatfinder
+    spec:
+      containers:
+      - name: seatfinder-container
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        ports:
+        - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: seatfinder-configmap

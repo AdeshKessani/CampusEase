@@ -1,0 +1,7 @@
+replicaCount: 2
+image:
+  repository: seatfinder/ai-resource
+  tag: latest
+service:
+  type: ClusterIP
+  port: 8080
