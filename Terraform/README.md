@@ -56,6 +56,4 @@ CampusEase is designed to provide a scalable, secure foundation for containerize
 ## Notes
 
 - Terraform state is managed in an S3 bucket with locking enabled for team collaboration.
-- Sensitive data like DB passwords are managed securely; master user password management is disabled here for demo purposes.
-- Adjust resource sizes and scaling parameters in modules to match production workloads.
-
+- Sensitive data like DB passwords are managed securely; master user password management is disabled here.
